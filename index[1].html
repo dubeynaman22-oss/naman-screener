@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ScreenCraft | AI Resume Screener & Recruiter Evaluation</title>
+  <meta name="description" content="Professional candidate resume screening web app powered by Senior Recruiter evaluation logic and Claude API." />
+
+  <!-- Google Fonts: Plus Jakarta Sans & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN with built-in fallback styles in styles.css -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    if (window.tailwind) {
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              brand: {
+                50: '#eff6ff',
+                100: '#dbeafe',
+                500: '#3b82f6',
+                600: '#2563eb',
+                700: '#1d4ed8',
+                800: '#1e40af',
+                900: '#1e3a8a'
+              },
+              navy: {
+                800: '#1e293b',
+                900: '#0f172a',
+                950: '#0b1120'
+              }
+            },
+            fontFamily: {
+              sans: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', 'sans-serif']
+            }
+          }
+        }
+      };
+    }
+  </script>
+
+  <!-- Local Vendor Scripts (Offline & CORS resilient) -->
+  <script src="vendor/pdf.min.js"></script>
+  <script src="vendor/mammoth.browser.min.js"></script>
+
+  <!-- CDN Fallbacks in case local vendor is not present -->
+  <script>
+    if (!window.pdfjsLib) {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"><\/script>');
+    }
+    if (!window.mammoth) {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"><\/script>');
+    }
+  </script>
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col selection:bg-blue-100 selection:text-blue-900">
+
+  <!-- Top Navigation Bar -->
+  <header class="bg-navy-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <!-- Brand Logo & Persona -->
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-lg font-bold tracking-tight text-white">ScreenCraft</h1>
+            <span class="text-[11px] font-semibold uppercase tracking-wider bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded border border-blue-400/30">Enterprise Screener</span>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">Senior Technical Recruiter Evaluation Engine (15+ Years Domain Rubric)</p>
+        </div>
+      </div>
+
+      <!-- Header Right Controls -->
+      <div class="flex items-center space-x-3">
+        <!-- Live API / Demo Mode Badge -->
+        <span id="apiStatusBadge" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+          Built-in Recruiter Mode (Demo)
+        </span>
+
+        <!-- Direct Download Button -->
+        <a href="my-college-assignment.zip" download="my-college-assignment.zip" id="downloadZipNavBtn" class="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-500 text-white shadow-sm transition" title="Download complete project ZIP">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+          </svg>
+          <span>Download ZIP</span>
+        </a>
+
+        <!-- Settings Button -->
+        <button id="settingsBtn" type="button" class="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition" title="Configure Claude API Key and Model">
+          <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+          </svg>
+          <span>Claude API Settings</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Pre-loaded Candidates Quick Bar -->
+  <section class="bg-white border-b border-slate-200/80 py-2.5 px-4 shadow-sm">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div class="flex items-center space-x-2 text-slate-600">
+        <span class="inline-flex items-center px-2 py-0.5 rounded font-bold bg-blue-100 text-blue-800 border border-blue-200">
+          ⚡ 1-Click Demo
+        </span>
+        <span class="font-semibold text-slate-700 hidden sm:inline">Try verified recruiter benchmarks:</span>
+      </div>
+      <!-- Direct 1-Click Buttons -->
+      <div class="flex flex-wrap items-center gap-2">
+        <button type="button" data-preset="senior-fullstack" class="quick-preset-btn px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-semibold transition flex items-center space-x-1 shadow-sm">
+          <span>Senior Full-Stack (92% Strong)</span>
+        </button>
+        <button type="button" data-preset="devops-architect" class="quick-preset-btn px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-xs font-semibold transition flex items-center space-x-1 shadow-sm">
+          <span>DevOps Architect (74% Moderate)</span>
+        </button>
+        <button type="button" data-preset="junior-career-changer" class="quick-preset-btn px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 rounded-lg text-xs font-semibold transition flex items-center space-x-1 shadow-sm">
+          <span>Career Changer (48% Weak)</span>
+        </button>
+        
+        <!-- Hidden/accessible dropdown fallback -->
+        <select id="presetSelect" class="hidden">
+          <option value="senior-fullstack">Senior Full-Stack Engineer</option>
+          <option value="devops-architect">DevOps Engineer</option>
+          <option value="junior-career-changer">Career Changer</option>
+        </select>
+        <button id="loadPresetBtn" type="button" class="hidden">Load</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Content Layout (Two-Column on Desktop) -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      
+      <!-- ================= LEFT COLUMN: INPUTS (5 Cols) ================= -->
+      <section class="lg:col-span-5 space-y-6" aria-label="Candidate and Role Inputs">
+        
+        <!-- CARD 1: Resume Input (Upload File OR Direct Paste) -->
+        <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-5 transition hover:shadow-md">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center space-x-2">
+              <span class="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">1</span>
+              <h2 class="text-sm font-bold text-navy-900 uppercase tracking-wider">Candidate Resume</h2>
+            </div>
+            
+            <!-- Tab Switcher: Upload File vs Paste Text -->
+            <div class="inline-flex p-0.5 bg-slate-100 rounded-lg border border-slate-200 text-xs">
+              <button type="button" id="tabUploadBtn" class="px-2.5 py-1 rounded-md font-semibold text-xs transition bg-white text-blue-600 shadow-sm">
+                Upload File
+              </button>
+              <button type="button" id="tabPasteBtn" class="px-2.5 py-1 rounded-md font-medium text-xs transition text-slate-600 hover:text-slate-900">
+                Paste Text
+              </button>
+            </div>
+          </div>
+
+          <!-- TAB CONTENT A: File Upload Zone -->
+          <div id="tabUploadContent">
+            <!-- Drag and Drop Zone -->
+            <div id="dropZone" class="border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl p-6 text-center cursor-pointer transition-all duration-200 bg-slate-50/70 hover:bg-blue-50/40 group select-none">
+              <input type="file" id="fileInput" class="hidden" accept=".pdf,.docx,.doc,.txt" />
+              <div class="flex flex-col items-center justify-center space-y-2 pointer-events-none">
+                <div class="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-105 transition transform">
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                  </svg>
+                </div>
+                <p class="text-sm font-semibold text-slate-700">
+                  <span class="text-blue-600 underline font-bold">Click to browse</span> or drag &amp; drop resume file
+                </p>
+                <p class="text-xs text-slate-400">
+                  Accepts PDF or Word (.docx) • Handled securely in browser
+                </p>
+              </div>
+            </div>
+
+            <!-- Uploaded File Info Card (Hidden initially) -->
+            <div id="fileInfoCard" class="hidden mt-2 p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+              <div class="flex items-center space-x-3 overflow-hidden">
+                <div class="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                </div>
+                <div class="min-w-0">
+                  <p id="fileName" class="text-xs font-bold text-slate-800 truncate">resume.pdf</p>
+                  <p id="fileMeta" class="text-[11px] text-slate-500 font-medium">124 KB • 1,200 words parsed</p>
+                </div>
+              </div>
+              <div class="flex items-center space-x-1.5 flex-shrink-0">
+                <button id="previewTextBtn" type="button" class="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50 transition" title="Preview extracted text">
+                  Inspect Text
+                </button>
+                <button id="removeFileBtn" type="button" class="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 transition" title="Remove resume">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Scanned / Image PDF Warning Banner (Hidden by default) -->
+            <div id="scannedWarning" class="hidden mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-start space-x-2">
+              <svg class="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+              </svg>
+              <div>
+                <p class="font-bold">Scanned or Image-Only Document Detected</p>
+                <p class="mt-0.5 text-amber-700">Very little machine-readable text was extracted. Use the "Paste Text" tab above to paste the resume text directly.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB CONTENT B: Direct Resume Textarea (Hidden by default) -->
+          <div id="tabPasteContent" class="hidden space-y-2">
+            <textarea
+              id="resumePasteTextarea"
+              rows="8"
+              placeholder="Paste candidate resume text here directly (Summary, Experience, Skills, Education, Projects)..."
+              class="w-full bg-slate-50 border border-slate-300 rounded-xl p-3.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition resize-y font-mono leading-relaxed"
+            ></textarea>
+            <div class="flex items-center justify-between text-xs text-slate-400 font-medium">
+              <span id="resumePasteStats">0 chars • 0 words</span>
+              <button type="button" id="clearPastedResumeBtn" class="text-xs text-slate-400 hover:text-slate-600 transition">
+                Clear
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- CARD 2: Job Description Area -->
+        <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-5 transition hover:shadow-md">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center space-x-2">
+              <span class="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">2</span>
+              <label for="jdTextarea" class="text-sm font-bold text-navy-900 uppercase tracking-wider">Paste Job Description</label>
+            </div>
+            <button id="clearJdBtn" type="button" class="text-xs text-slate-400 hover:text-slate-600 transition font-medium">
+              Clear Text
+            </button>
+          </div>
+
+          <div class="relative">
+            <textarea
+              id="jdTextarea"
+              rows="8"
+              placeholder="Paste the full job description here (include required qualifications, responsibilities, preferred skills, tech stack, and experience benchmarks)..."
+              class="w-full bg-slate-50 border border-slate-300 rounded-xl p-3.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition resize-y font-mono leading-relaxed"
+            ></textarea>
+          </div>
+
+          <!-- Real-time Metrics Bar -->
+          <div class="flex items-center justify-between mt-2 text-xs text-slate-400 font-medium">
+            <div class="flex items-center space-x-3">
+              <span id="jdCharCount">0 chars</span>
+              <span>•</span>
+              <span id="jdWordCount">0 words</span>
+            </div>
+            <span class="text-[11px] text-slate-400 italic">Includes must-haves &amp; nice-to-haves</span>
+          </div>
+        </div>
+
+        <!-- CARD 3: Action Button, Status Checklist & Fairness Notice -->
+        <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-5 space-y-3">
+          
+          <!-- Live Input Readiness Checklist -->
+          <div class="flex items-center justify-between text-xs font-semibold px-2 py-1.5 bg-slate-50 rounded-lg border border-slate-200">
+            <div class="flex items-center space-x-1.5">
+              <span id="checkResumeIcon" class="text-slate-400 font-bold">○</span>
+              <span id="checkResumeLabel" class="text-slate-500">Resume</span>
+            </div>
+            <div class="flex items-center space-x-1.5">
+              <span id="checkJdIcon" class="text-slate-400 font-bold">○</span>
+              <span id="checkJdLabel" class="text-slate-500">Job Description</span>
+            </div>
+            <div class="flex items-center space-x-1.5">
+              <span id="checkReadyIcon" class="text-slate-400 font-bold">○</span>
+              <span id="checkReadyLabel" class="text-slate-500">Ready to Analyze</span>
+            </div>
+          </div>
+
+          <!-- Primary CTA Button -->
+          <button
+            id="analyzeBtn"
+            type="button"
+            disabled
+            class="w-full py-3.5 px-4 rounded-xl font-bold text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed disabled:shadow-none shadow-md shadow-blue-500/20 transition-all flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            <!-- Loading Spinner (Hidden by default) -->
+            <svg id="analyzeBtnSpinner" class="hidden animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span id="analyzeBtnText">Analyze Candidate</span>
+          </button>
+
+          <!-- Fairness & Regulatory Guardrail Footnote -->
+          <div class="p-3 bg-slate-50 border border-slate-200/80 rounded-xl text-[11px] text-slate-500 leading-relaxed flex items-start space-x-2">
+            <svg class="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+            </svg>
+            <div>
+              <span class="font-semibold text-slate-700">Fairness &amp; Compliance Guardrail:</span>
+              Name, gender, age, photo, nationality, and protected attributes are strictly ignored. Evaluations are objective decision support based solely on verifiable qualifications.
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ================= RIGHT COLUMN: RESULTS PANEL (7 Cols) ================= -->
+      <section class="lg:col-span-7 space-y-6" aria-label="Recruiter Screening Assessment">
+        
+        <!-- STATE A: Empty / Idle Prompt State -->
+        <div id="emptyState" class="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-10 text-center flex flex-col items-center justify-center min-h-[560px]">
+          <div class="w-16 h-16 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-4 shadow-inner">
+            <svg class="w-8 h-8 text-blue-500/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+            </svg>
+          </div>
+          <h3 class="text-base font-bold text-slate-800">Ready for Candidate Screening</h3>
+          <p class="text-xs text-slate-500 max-w-md mt-1 mb-6 leading-relaxed">
+            Upload a candidate's resume (or paste text) and paste the job description on the left. The evaluation engine applies a 15+ year recruiter rubric to deliver actionable hiring insights.
+          </p>
+
+          <!-- Recruiter Rubric Checklist Breakdown -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left w-full max-w-lg">
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200/70 text-xs">
+              <p class="font-bold text-slate-700 flex items-center space-x-1.5">
+                <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                <span>Required vs. Preferred Skills</span>
+              </p>
+              <p class="text-[11px] text-slate-500 mt-1">Differentiates core must-haves from secondary nice-to-haves.</p>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200/70 text-xs">
+              <p class="font-bold text-slate-700 flex items-center space-x-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span>Experience Depth &amp; Seniority</span>
+              </p>
+              <p class="text-[11px] text-slate-500 mt-1">Benchmarks total years, scope of ownership, and leadership.</p>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200/70 text-xs">
+              <p class="font-bold text-slate-700 flex items-center space-x-1.5">
+                <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                <span>Tenure &amp; Career Progression</span>
+              </p>
+              <p class="text-[11px] text-slate-500 mt-1">Analyzes stability, upward mobility, and unexplained gaps.</p>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200/70 text-xs">
+              <p class="font-bold text-slate-700 flex items-center space-x-1.5">
+                <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                <span>Quantifiable Impact &amp; ATS</span>
+              </p>
+              <p class="text-[11px] text-slate-500 mt-1">Scores metric-driven achievements and ATS keyword density.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- STATE B: Loading State -->
+        <div id="loadingState" class="hidden bg-white rounded-2xl border border-slate-200/90 shadow-sm p-12 text-center flex flex-col items-center justify-center min-h-[560px]">
+          <div class="relative w-16 h-16 mb-4">
+            <div class="w-16 h-16 rounded-full border-4 border-blue-100 border-t-blue-600 animate-spin"></div>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <svg class="w-6 h-6 text-blue-600 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+              </svg>
+            </div>
+          </div>
+          <h3 class="text-sm font-bold text-slate-800">Recruiter Screening In Progress</h3>
+          <p id="loadingStatusText" class="text-xs text-blue-600 font-semibold mt-1 animate-pulse">
+            Extracting candidate credentials and indexing competencies...
+          </p>
+          <p class="text-[11px] text-slate-400 mt-3 max-w-xs">
+            Cross-referencing technical skills, tenure stability, and ATS keyword relevance.
+          </p>
+        </div>
+
+        <!-- STATE C: Active Results Assessment Panel -->
+        <div id="resultsState" class="hidden space-y-6">
+
+          <!-- CARD 1: Executive Top Bar (Gauge, Verdict, Shortlist) -->
+          <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-6 relative overflow-hidden">
+            <div class="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-6">
+              
+              <!-- Match Score Gauge -->
+              <div class="flex items-center space-x-5 flex-shrink-0">
+                <div class="relative w-28 h-28 flex items-center justify-center">
+                  <svg class="w-28 h-28 transform -rotate-90" viewBox="0 0 100 100">
+                    <!-- Background Circle Track -->
+                    <circle cx="50" cy="50" r="45" stroke="#f1f5f9" stroke-width="9" fill="transparent"></circle>
+                    <!-- Animated Progress Circle -->
+                    <circle
+                      id="gaugeCircle"
+                      cx="50"
+                      cy="50"
+                      r="45"
+                      stroke="#10b981"
+                      stroke-width="9"
+                      stroke-linecap="round"
+                      fill="transparent"
+                      stroke-dasharray="282.74"
+                      stroke-dashoffset="282.74"
+                    ></circle>
+                  </svg>
+                  <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+                    <span id="matchScoreValue" class="text-2xl font-extrabold text-slate-900 tracking-tight leading-none">0%</span>
+                    <span class="text-[10px] font-semibold uppercase text-slate-400 tracking-wider mt-0.5">Match</span>
+                  </div>
+                </div>
+
+                <!-- Verdict & Shortlist Badges -->
+                <div class="space-y-1.5 text-center sm:text-left">
+                  <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                    <span id="verdictBadge" class="badge-verdict verdict-strong">Strong Fit</span>
+                    <span id="shortlistBadge" class="badge-shortlist shortlist-yes">Shortlist: YES</span>
+                  </div>
+                  <p class="text-xs font-semibold text-slate-700">Senior Recruiter Recommendation</p>
+                  <p id="oneLineRationale" class="text-xs text-slate-500 italic max-w-sm leading-snug">
+                    Solid technical background with 8+ years experience; aligns well with core requirements.
+                  </p>
+                </div>
+              </div>
+
+              <!-- Report Action Buttons -->
+              <div class="flex items-center space-x-2 flex-shrink-0 self-center sm:self-start">
+                <button
+                  id="copySummaryBtn"
+                  type="button"
+                  class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 text-xs font-medium transition inline-flex items-center space-x-1.5"
+                  title="Copy recruiter summary for hiring manager email"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path>
+                  </svg>
+                  <span>Copy Note</span>
+                </button>
+                <button
+                  id="printReportBtn"
+                  type="button"
+                  class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 text-xs font-medium transition inline-flex items-center space-x-1.5"
+                  title="Print or export as PDF"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                  </svg>
+                  <span>Print</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Sub-Score Breakdown (4 Bars) -->
+            <div class="mt-6 pt-5 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <!-- Sub 1: Skills -->
+              <div class="space-y-1">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-slate-500 font-medium">Skills Match</span>
+                  <span id="subScoreSkills" class="font-bold text-slate-800">0%</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                  <div id="subScoreSkillsBar" class="bg-blue-600 h-1.5 rounded-full transition-all duration-700" style="width: 0%"></div>
+                </div>
+              </div>
+
+              <!-- Sub 2: Experience -->
+              <div class="space-y-1">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-slate-500 font-medium">Experience</span>
+                  <span id="subScoreExp" class="font-bold text-slate-800">0%</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                  <div id="subScoreExpBar" class="bg-blue-600 h-1.5 rounded-full transition-all duration-700" style="width: 0%"></div>
+                </div>
+              </div>
+
+              <!-- Sub 3: Domain -->
+              <div class="space-y-1">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-slate-500 font-medium">Domain Fit</span>
+                  <span id="subScoreDomain" class="font-bold text-slate-800">0%</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                  <div id="subScoreDomainBar" class="bg-blue-600 h-1.5 rounded-full transition-all duration-700" style="width: 0%"></div>
+                </div>
+              </div>
+
+              <!-- Sub 4: Education & Certs -->
+              <div class="space-y-1">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-slate-500 font-medium">Education</span>
+                  <span id="subScoreEdu" class="font-bold text-slate-800">0%</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                  <div id="subScoreEduBar" class="bg-blue-600 h-1.5 rounded-full transition-all duration-700" style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD 2: Recruiter Executive Summary (Hiring Manager Brief) -->
+          <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-6">
+            <div class="flex items-center space-x-2 mb-2">
+              <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
+              </svg>
+              <h3 class="text-xs font-bold text-navy-900 uppercase tracking-wider">Recruiter Executive Summary (3-4 Sentences)</h3>
+            </div>
+            <div class="p-4 bg-slate-50/80 rounded-xl border border-slate-200/70">
+              <p id="recruiterSummary" class="text-xs text-slate-700 leading-relaxed font-sans">
+                <!-- Populated dynamically -->
+              </p>
+            </div>
+          </div>
+
+          <!-- CARD 3: Match vs. Mismatch Split (Two Columns) -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <!-- Key Matches & Strengths -->
+            <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-5 space-y-3">
+              <div class="flex items-center space-x-2 text-emerald-700">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-800">Areas of Match (Key Evidence)</h4>
+              </div>
+              <ul id="matchList" class="space-y-2 text-xs text-slate-700">
+                <!-- Rendered by JS -->
+              </ul>
+            </div>
+
+            <!-- Gaps & Missing Must-Haves -->
+            <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-5 space-y-3">
+              <div class="flex items-center space-x-2 text-rose-600">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-800">Areas of Mismatch / Gaps</h4>
+              </div>
+              <ul id="mismatchList" class="space-y-2 text-xs text-slate-700">
+                <!-- Rendered by JS -->
+              </ul>
+            </div>
+
+          </div>
+
+          <!-- CARD 4: ATS Keywords & Career Progression -->
+          <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-6 space-y-4">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-navy-900">ATS Keyword Alignment &amp; Career Trajectory</h4>
+            
+            <!-- Keywords section -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <span class="text-[11px] font-semibold text-emerald-700 block mb-1.5">Matched Keywords in Resume:</span>
+                <div id="matchedKeywordsList" class="flex flex-wrap gap-1.5">
+                  <!-- Populated dynamically -->
+                </div>
+              </div>
+              <div>
+                <span class="text-[11px] font-semibold text-rose-600 block mb-1.5">Missing Target Keywords from JD:</span>
+                <div id="missingKeywordsList" class="flex flex-wrap gap-1.5">
+                  <!-- Populated dynamically -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Career Progression & Tenure -->
+            <div class="pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div class="flex items-center space-x-2">
+                <span class="text-xs font-semibold text-slate-700">Tenure Progression:</span>
+                <span id="tenureRating" class="badge-tenure stability-high">Stability: High</span>
+              </div>
+              <p id="tenureObservation" class="text-xs text-slate-500 italic max-w-md">
+                Continuous progression with healthy multi-year tenures.
+              </p>
+            </div>
+          </div>
+
+          <!-- CARD 5: Red Flags & Suggested Interview Probes -->
+          <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-6 space-y-4">
+            
+            <!-- Red Flags & Risks -->
+            <div id="redFlagsContainer" class="space-y-2">
+              <div class="flex items-center space-x-2 text-amber-700">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-800">Recruiter Risks &amp; Red Flags</h4>
+              </div>
+              <ul id="redFlagsList" class="space-y-1.5 text-xs text-slate-700">
+                <!-- Rendered by JS -->
+              </ul>
+            </div>
+
+            <!-- Suggested Interview Questions -->
+            <div class="pt-4 border-t border-slate-100 space-y-2">
+              <div class="flex items-center space-x-2 text-blue-700">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-800">Targeted Recruiter Interview Probes (To Validate Weak Spots)</h4>
+              </div>
+              <ul id="interviewQuestionsList" class="space-y-2 text-xs text-slate-700">
+                <!-- Rendered by JS -->
+              </ul>
+            </div>
+
+          </div>
+
+          <!-- Bottom Actions & Full Report Export -->
+          <div class="flex flex-wrap items-center justify-between gap-3 p-4 bg-slate-100 rounded-2xl border border-slate-200">
+            <p class="text-xs text-slate-600 font-medium">Export this evaluation for your ATS or hiring committee:</p>
+            <div class="flex items-center space-x-2">
+              <button id="copyFullReportBtn" type="button" class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-sm transition">
+                Copy Full Report (Markdown)
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+    </div>
+  </main>
+
+  <!-- ================= MODALS & DRAWERS ================= -->
+
+  <!-- Modal 1: Claude API Settings -->
+  <div id="settingsModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 p-6 space-y-4" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+      <div class="flex items-center justify-between">
+        <h3 id="settingsModalTitle" class="text-sm font-bold text-navy-900">Claude API Configuration</h3>
+        <button id="closeSettingsBtn" type="button" class="text-slate-400 hover:text-slate-600 p-1 rounded-md" aria-label="Close settings">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <p class="text-xs text-slate-500 leading-relaxed">
+        Provide an Anthropic API Key for live Claude analysis. Calls run client-side with direct browser access. When left blank, the app runs the built-in 15+ year recruiter evaluation engine.
+      </p>
+
+      <!-- API Key Field -->
+      <div>
+        <label for="apiKeyInput" class="block text-xs font-bold text-slate-700 mb-1">Anthropic API Key</label>
+        <div class="relative">
+          <input
+            type="password"
+            id="apiKeyInput"
+            placeholder="sk-ant-api03-..."
+            class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 pr-16"
+          />
+          <button id="toggleKeyVisibility" type="button" class="absolute right-2 top-2 text-[11px] font-semibold text-slate-500 hover:text-slate-800 px-1.5 py-0.5 rounded">
+            Show
+          </button>
+        </div>
+        <p id="apiTestFeedback" class="text-xs mt-1"></p>
+      </div>
+
+      <!-- Model Selection -->
+      <div>
+        <label for="modelSelect" class="block text-xs font-bold text-slate-700 mb-1">Evaluation Model</label>
+        <select id="modelSelect" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Recommended - Deep Recruiter Nuance)</option>
+          <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast Screening)</option>
+          <option value="claude-3-7-sonnet-20250219">Claude 3.7 Sonnet (Hybrid Reasoning)</option>
+        </select>
+      </div>
+
+      <!-- Storage Preference -->
+      <div>
+        <label for="storagePreference" class="block text-xs font-bold text-slate-700 mb-1">Key Storage Preference</label>
+        <select id="storagePreference" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="session">Session Only (Cleared when browser tab closes)</option>
+          <option value="local">Local Storage (Persist on this computer)</option>
+          <option value="none">Do Not Store</option>
+        </select>
+      </div>
+
+      <!-- Actions -->
+      <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+        <button id="clearKeyBtn" type="button" class="text-xs text-rose-600 hover:text-rose-800 font-medium">
+          Clear Key
+        </button>
+        <div class="flex items-center space-x-2">
+          <button id="testApiBtn" type="button" class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-medium transition">
+            Test Key
+          </button>
+          <button id="saveSettingsBtn" type="button" class="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-sm">
+            Save Settings
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Extracted Text Inspector -->
+  <div id="textPreviewModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 p-6 space-y-3" role="dialog" aria-modal="true" aria-labelledby="textPreviewModalTitle">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 id="textPreviewModalTitle" class="text-sm font-bold text-navy-900">Extracted Resume Text (Parsed in Browser)</h3>
+          <p class="text-[11px] text-slate-400">Verifies what PDF.js or Mammoth.js extracted from your file.</p>
+        </div>
+        <button id="closePreviewBtn" type="button" class="text-slate-400 hover:text-slate-600 p-1 rounded-md" aria-label="Close modal">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto bg-slate-50 border border-slate-200 rounded-xl p-4 font-mono text-xs text-slate-700 whitespace-pre-wrap leading-relaxed max-h-[50vh]">
+        <pre id="previewTextContent">No text available.</pre>
+      </div>
+
+      <div class="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
+        <button id="copyExtractedTextBtn" type="button" class="px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition shadow-sm">
+          Copy Extracted Text
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Toast Notification -->
+  <div id="toast" class="hidden fixed bottom-5 right-5 z-50 bg-slate-900 text-white text-xs px-4 py-3 rounded-xl shadow-2xl border-l-4 border-emerald-500 max-w-sm flex items-center space-x-2 transition-all">
+    <span id="toastMessage">Notification message</span>
+  </div>
+
+  <!-- App JavaScript -->
+  <script src="sample-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
